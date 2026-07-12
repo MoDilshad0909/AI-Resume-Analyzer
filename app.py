@@ -8,7 +8,7 @@ from utils.extractor import (
     extract_experience, extract_projects
 )
 from utils.ats import (
-    calculate_ats_score, find_missing_skills, generate_recommendations
+    calculate_ats_score, find_missing_skills, generate_recommendations, check_resume_sections
 )
 from utils.matcher import (
     extract_keywords, calculate_match_score,
@@ -24,9 +24,14 @@ from utils.linkedin import generate_linkedin_headline, generate_professional_sum
 from utils.email_generator import generate_cold_email
 from utils.interview import generate_interview_questions
 
-# Day 8 Imports
 from utils.exporter import export_txt, export_markdown, export_pdf, export_docx
 from utils.history import save_resume_version, load_resume_history
+
+# Day 9 Imports
+from utils.dashboard import (
+    display_ats_gauge, display_section_chart, display_skills_chart,
+    display_missing_skills, display_match_score, display_summary_cards
+)
 
 def init_session_state():
     """Initializes Streamlit session state variables for the Export Center."""
@@ -40,19 +45,18 @@ def init_session_state():
             'Interview Questions': ''
         }
     if 'current_session_id' not in st.session_state:
-        # Default session ID, can be tied to user login later
         st.session_state.current_session_id = "user_session"
     if 'raw_extracted_data' not in st.session_state:
         st.session_state.raw_extracted_data = {}
 
 def main():
     """
-    Main function to run the Streamlit AI Resume Analyzer application.
+    Main function to run the Premium Streamlit AI Resume Analyzer application.
     """
     init_session_state()
     
     st.set_page_config(
-        page_title="AI Career Assistant",
+        page_title="Premium AI Career Assistant",
         page_icon="📄",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -80,14 +84,13 @@ def main():
         session_name = st.text_input("Session ID (For History)", value=st.session_state.current_session_id)
         if session_name:
             st.session_state.current_session_id = session_name
-            
         st.info("Check your `.env` file to ensure `GEMINI_API_KEY` is configured for AI features.")
 
     col1, col2 = st.columns([1, 8])
     with col1:
         st.image("https://via.placeholder.com/80x80.png?text=Icon", use_container_width=True)
     with col2:
-        st.title("AI Career Assistant")
+        st.title("Premium AI Career Assistant")
         st.subheader("Your end-to-end intelligent career optimization platform.")
 
     st.markdown("---")
@@ -122,15 +125,65 @@ def main():
             }
             st.session_state.raw_extracted_data = extracted_data
 
+            # Pre-calculate Scores
+            score, strengths, weaknesses = calculate_ats_score(extracted_data, extracted_text)
+            missing_skills = find_missing_skills(skills)
+            
+            match_score = 0
+            if jd_text.strip():
+                resume_skills_list = [s.strip() for s in skills.split(',')] if skills != "Not Found" else []
+                jd_keywords = extract_keywords(jd_text)
+                matched_skills = get_matching_skills(resume_skills_list, jd_keywords)
+                match_score = calculate_match_score(matched_skills, jd_keywords)
+
             st.success("✅ Resume Processed Successfully!")
             st.markdown("---")
             
-            # Expanded Tabs for Day 8
+            # --- DAY 9: Premium Analytics Dashboard UI ---
+            st.markdown("## 📈 Premium Analytics Dashboard")
+            st.markdown("========================")
+            
+            # Summary Cards
+            skills_count = len(skills.split(',')) if skills != "Not Found" else 0
+            has_projects = projects != "Not Found"
+            has_experience = experience != "Not Found"
+            
+            display_summary_cards(
+                ats_score=score, 
+                match_score=match_score, 
+                skills_found_count=skills_count, 
+                missing_skills_count=len(missing_skills), 
+                has_projects=has_projects, 
+                has_experience=has_experience
+            )
+            
+            # Top row charts
+            dash_col1, dash_col2 = st.columns(2)
+            with dash_col1:
+                display_ats_gauge(score)
+            with dash_col2:
+                display_match_score(match_score)
+                
+            # Bottom row charts
+            dash_col3, dash_col4, dash_col5 = st.columns(3)
+            with dash_col3:
+                display_skills_chart(skills)
+            with dash_col4:
+                display_missing_skills(missing_skills)
+            with dash_col5:
+                display_section_chart(check_resume_sections(extracted_data))
+                
+            # Recommendations placed right after dashboard
+            st.markdown("### 💡 AI Recommendations")
+            ats_recommendations = generate_recommendations(weaknesses, missing_skills)
+            for r in ats_recommendations: 
+                st.info(f"- {r}")
+                
+            st.markdown("---")
+            st.markdown("## ⚙️ Generative AI Tools")
+            
             tabs = st.tabs([
-                "📝 Extracted Info", 
-                "📊 ATS Score", 
-                "🎯 JD Match", 
-                "🤖 Resume Review",
+                "🤖 AI Rewrite",
                 "✉️ Cover Letter",
                 "💼 LinkedIn",
                 "📧 Cold Email",
@@ -139,56 +192,11 @@ def main():
                 "🕰️ History"
             ])
             
-            tab_extract, tab_ats, tab_jd, tab_ai, tab_cover, tab_linkedin, tab_email, tab_interview, tab_export, tab_history = tabs
+            tab_ai, tab_cover, tab_linkedin, tab_email, tab_interview, tab_export, tab_history = tabs
             
-            with tab_extract:
-                col_a, col_b, col_c = st.columns(3)
-                with col_a: st.markdown(f'<div class="info-card"><h4>👤 Name</h4><p>{name}</p></div>', unsafe_allow_html=True)
-                with col_b: st.markdown(f'<div class="info-card"><h4>📧 Email</h4><p>{email}</p></div>', unsafe_allow_html=True)
-                with col_c: st.markdown(f'<div class="info-card"><h4>📱 Phone</h4><p>{phone}</p></div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="info-card"><h4>🛠️ Skills</h4><p>{skills}</p></div>', unsafe_allow_html=True)
-                col_d, col_e, col_f = st.columns(3)
-                with col_d: st.markdown(f'<div class="info-card"><h4>🎓 Education</h4><p>{education}</p></div>', unsafe_allow_html=True)
-                with col_e: st.markdown(f'<div class="info-card"><h4>💼 Experience</h4><p>{experience}</p></div>', unsafe_allow_html=True)
-                with col_f: st.markdown(f'<div class="info-card"><h4>📂 Projects</h4><p>{projects}</p></div>', unsafe_allow_html=True)
-
-            with tab_ats:
-                score, strengths, weaknesses = calculate_ats_score(extracted_data, extracted_text)
-                missing_skills = find_missing_skills(skills)
-                ats_recommendations = generate_recommendations(weaknesses, missing_skills)
-                
-                st.markdown(f"#### Overall Score: **{score}/100**")
-                st.progress(score / 100)
-                col_s, col_w = st.columns(2)
-                with col_s:
-                    st.markdown("##### ✅ Strengths")
-                    for s in strengths: st.markdown(f"- {s}")
-                with col_w:
-                    st.markdown("##### ❌ Weaknesses")
-                    for w in weaknesses: st.markdown(f"- {w}")
-                st.markdown("##### 💡 Recommendations")
-                for r in ats_recommendations: st.markdown(f"- {r}")
-
-            with tab_jd:
-                if not jd_text.strip():
-                    st.info("ℹ️ Paste a Job Description above to see semantic matching.")
-                else:
-                    resume_skills_list = [s.strip() for s in skills.split(',')] if skills != "Not Found" else []
-                    with st.spinner("Calculating semantic match..."):
-                        jd_keywords = extract_keywords(jd_text)
-                        matched_skills = get_matching_skills(resume_skills_list, jd_keywords)
-                        missing_skills_jd = get_missing_skills(matched_skills, jd_keywords)
-                        match_score = calculate_match_score(matched_skills, jd_keywords)
-                        st.markdown(f"### 🎯 Resume Match: **{match_score}%**")
-                        st.progress(match_score / 100)
-                        col_stats1, col_stats2, col_stats3 = st.columns(3)
-                        col_stats1.metric("JD Skills", len(jd_keywords))
-                        col_stats2.metric("Matched", len(matched_skills))
-                        col_stats3.metric("Missing", len(missing_skills_jd))
-
             with tab_ai:
-                st.markdown("### 🤖 Intelligent Resume Review")
-                if st.button("✨ Generate Review", key="btn_review"):
+                st.markdown("### 🤖 Intelligent Resume Rewrite")
+                if st.button("✨ Generate AI Insights", key="btn_review"):
                     with st.spinner("Analyzing..."):
                         ai_review = review_resume(extracted_text)
                         ai_sum = improve_summary(extracted_text)
@@ -196,14 +204,13 @@ def main():
                         ai_fb = generate_resume_feedback(extracted_text)
                         ai_kws = suggest_missing_keywords(extracted_text, jd_text) if jd_text.strip() else "No JD provided."
                         
-                        st.info(ai_review)
-                        st.success(ai_sum)
-                        st.success(ai_exp)
-                        st.warning(ai_fb)
+                        st.info(f"**Professional Critique:**\n{ai_review}")
+                        st.success(f"**Improved Summary:**\n{ai_sum}")
+                        st.success(f"**Rewritten Experience (STAR):**\n{ai_exp}")
+                        st.warning(f"**Formatting Feedback:**\n{ai_fb}")
                         if jd_text.strip():
-                            st.error(ai_kws)
+                            st.error(f"**JD Missing Keywords:**\n{ai_kws}")
                             
-                        # Save to session
                         st.session_state.generated_content['Resume Review'] = f"Review:\n{ai_review}\n\nSummary:\n{ai_sum}\n\nExperience:\n{ai_exp}\n\nFeedback:\n{ai_fb}\n\nKeywords:\n{ai_kws}"
 
             with tab_cover:
@@ -253,11 +260,9 @@ def main():
                             st.session_state.generated_content['Interview Questions'] = int_text
                             st.markdown(int_text)
 
-            # --- Day 8: Export Center ---
             with tab_export:
                 st.markdown("### 📤 Export Center")
                 st.markdown("Download your AI-generated content in various formats.")
-                
                 content_options = [k for k, v in st.session_state.generated_content.items() if v]
                 
                 if not content_options:
@@ -270,12 +275,9 @@ def main():
                         format_choice = st.selectbox("Select Format", ["PDF", "DOCX", "TXT", "Markdown"])
                         
                     content_to_export = st.session_state.generated_content[selected_content]
-                    
                     st.markdown("---")
                     
-                    # File generation
                     filename_base = selected_content.replace(" ", "_")
-                    
                     if format_choice == "TXT":
                         data = export_txt(content_to_export)
                         mime = "text/plain"
@@ -301,10 +303,8 @@ def main():
                         use_container_width=True
                     )
 
-            # --- Day 8: History ---
             with tab_history:
                 st.markdown("### 🕰️ Resume Version History")
-                
                 if st.button("💾 Save Current Session"):
                     session_data = {
                         "extracted_data": st.session_state.raw_extracted_data,
@@ -316,7 +316,6 @@ def main():
                     
                 st.markdown("---")
                 st.markdown("#### Previous Sessions")
-                
                 histories = load_resume_history(st.session_state.current_session_id)
                 if not histories:
                     st.info("No saved history found for this session ID.")
@@ -328,7 +327,7 @@ def main():
         except Exception as e:
             st.error(f"❌ **Failed to process Request:** {e}")
 
-    st.markdown('<div class="footer"><p>© 2026 AI Career Assistant | Built with Streamlit & Gemini AI</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer"><p>© 2026 AI Career Assistant | Built with Streamlit, Plotly & Gemini AI</p></div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
