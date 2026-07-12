@@ -1,0 +1,96 @@
+import streamlit as st
+
+def main():
+    """
+    Main function to run the Streamlit AI Resume Analyzer application.
+    """
+    # Set page configuration for a professional look
+    st.set_page_config(
+        page_title="AI Resume Analyzer",
+        page_icon="📄",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    # --- CSS for modern white UI ---
+    st.markdown("""
+        <style>
+        .main {
+            background-color: #FFFFFF;
+            color: #333333;
+        }
+        .stButton>button {
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            border: none;
+            padding: 10px 24px;
+            font-weight: bold;
+        }
+        .stButton>button:hover {
+            background-color: #45a049;
+        }
+        .footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            color: #6c757d;
+            text-align: center;
+            padding: 15px;
+            font-size: 14px;
+            border-top: 1px solid #dee2e6;
+            z-index: 999;
+        }
+        .block-container {
+            padding-bottom: 80px; /* Space for footer */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- Sidebar ---
+    with st.sidebar:
+        st.image("https://via.placeholder.com/300x100.png?text=Logo+Placeholder", use_container_width=True)
+        st.title("Settings")
+        st.markdown("Configure your AI Resume Analyzer here.")
+        st.markdown("---")
+        st.info("Additional configuration options (e.g., Target Job Role, API settings) will be added here in future updates.")
+
+    # --- Main Content ---
+    # Header Section
+    col1, col2 = st.columns([1, 8])
+    with col1:
+        st.image("https://via.placeholder.com/80x80.png?text=Icon", use_container_width=True)
+    with col2:
+        st.title("AI Resume Analyzer")
+        st.subheader("Leverage Generative AI to optimize your resume for ATS and industry standards.")
+
+    st.markdown("---")
+
+    # Upload Section
+    st.markdown("### 📥 Upload Your Resume")
+    st.markdown("Please upload your resume in **PDF** format for analysis.")
+    
+    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
+
+    if uploaded_file is not None:
+        st.success(f"✅ Successfully uploaded: **{uploaded_file.name}**")
+        st.info("🚀 Resume parsing, ATS scoring, and AI analysis features are currently in development and will be available soon!")
+        
+        # Placeholder for where future logic will go
+        # e.g., text = parse_pdf(uploaded_file)
+        # analyze_resume(text)
+
+    # --- Footer ---
+    st.markdown(
+        """
+        <div class="footer">
+            <p>Developed with ❤️ for Data Science & AI Portfolio | © 2026 AI Resume Analyzer</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+if __name__ == "__main__":
+    main()
