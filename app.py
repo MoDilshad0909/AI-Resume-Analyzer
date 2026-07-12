@@ -5,6 +5,9 @@ from utils.extractor import (
     extract_skills, extract_education,
     extract_experience, extract_projects
 )
+from utils.ats import (
+    calculate_ats_score, find_missing_skills, generate_recommendations
+)
 
 def main():
     """
@@ -120,12 +123,6 @@ def main():
             # Extract text using our custom parser
             extracted_text = extract_text_from_pdf(file_bytes)
             
-            # Display Success Message
-            st.success("✅ Resume Uploaded Successfully")
-            
-            # --- Day 3: Structured Information Extraction ---
-            st.markdown("### 🔍 Extracted Information")
-            
             # Extract fields
             name = extract_name(extracted_text)
             email = extract_email(extracted_text)
@@ -134,6 +131,68 @@ def main():
             education = extract_education(extracted_text)
             experience = extract_experience(extracted_text)
             projects = extract_projects(extracted_text)
+            
+            extracted_data = {
+                "name": name,
+                "email": email,
+                "phone": phone,
+                "skills": skills,
+                "education": education,
+                "experience": experience,
+                "projects": projects
+            }
+
+            st.success("✅ Resume Uploaded and Processed Successfully!")
+            
+            # --- Day 4: ATS Score Dashboard ---
+            st.markdown("---")
+            st.markdown("## 📊 ATS Evaluation Dashboard")
+            
+            score, strengths, weaknesses = calculate_ats_score(extracted_data, extracted_text)
+            missing_skills = find_missing_skills(skills)
+            recommendations = generate_recommendations(weaknesses, missing_skills)
+            
+            # Score and Progress Bar
+            st.markdown(f"### Overall ATS Score: **{score}/100**")
+            st.progress(score / 100)
+            
+            if score >= 80:
+                st.success("Excellent! Your resume is highly compatible with ATS.")
+            elif score >= 60:
+                st.warning("Good, but there is room for improvement to pass strict ATS filters.")
+            else:
+                st.error("Needs Work. Please review the recommendations below to improve your score.")
+                
+            # Layout for Strengths and Weaknesses
+            col_s, col_w = st.columns(2)
+            with col_s:
+                st.markdown("#### ✅ Resume Strengths")
+                for s in strengths:
+                    st.markdown(f"- {s}")
+            with col_w:
+                st.markdown("#### ❌ Resume Weaknesses")
+                for w in weaknesses:
+                    st.markdown(f"- {w}")
+                    
+            st.markdown("<br>", unsafe_allow_html=True)
+                    
+            # Layout for Missing Skills and Recommendations
+            col_m, col_r = st.columns(2)
+            with col_m:
+                st.markdown("#### 🔍 Missing Industry Skills")
+                if missing_skills:
+                    for ms in missing_skills:
+                        st.markdown(f"- `{ms}`")
+                else:
+                    st.success("No critical industry skills missing!")
+            with col_r:
+                st.markdown("#### 💡 Actionable Recommendations")
+                for r in recommendations:
+                    st.markdown(f"- {r}")
+            
+            # --- Day 3: Structured Information Extraction ---
+            st.markdown("---")
+            st.markdown("### 🔍 Extracted Information")
             
             # Display fields in cards using Streamlit columns
             col_a, col_b, col_c = st.columns(3)
