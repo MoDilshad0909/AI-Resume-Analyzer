@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.parser import extract_text_from_pdf
 
 def main():
     """
@@ -46,6 +47,15 @@ def main():
         .block-container {
             padding-bottom: 80px; /* Space for footer */
         }
+        /* Style for the text area to look more like a code/preview block */
+        .stTextArea textarea {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px !important;
+            background-color: #f8f9fa;
+            color: #212529;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -75,12 +85,35 @@ def main():
     uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
     if uploaded_file is not None:
-        st.success(f"✅ Successfully uploaded: **{uploaded_file.name}**")
-        st.info("🚀 Resume parsing, ATS scoring, and AI analysis features are currently in development and will be available soon!")
-        
-        # Placeholder for where future logic will go
-        # e.g., text = parse_pdf(uploaded_file)
-        # analyze_resume(text)
+        try:
+            # Read the uploaded PDF file as bytes
+            file_bytes = uploaded_file.read()
+            
+            # Extract text using our custom parser
+            extracted_text = extract_text_from_pdf(file_bytes)
+            
+            # Display Success Message
+            st.success("✅ Resume Uploaded Successfully")
+            
+            # Display Preview Section
+            st.markdown("### 📄 Resume Preview")
+            st.markdown("#### Extracted Resume Text")
+            
+            # Display extracted text in a large scrollable text area
+            st.text_area(
+                label="Extracted Text",
+                value=extracted_text,
+                height=400,
+                disabled=True,
+                label_visibility="collapsed"
+            )
+            
+        except ValueError as ve:
+            # Handle empty PDF, image-based PDF, etc.
+            st.error(f"⚠️ **Parsing Error:** {ve}")
+        except Exception as e:
+            # Handle corrupted or unsupported PDFs
+            st.error(f"❌ **Failed to process PDF:** {e}")
 
     # --- Footer ---
     st.markdown(
