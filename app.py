@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+from datetime import datetime
 from utils.parser import extract_text_from_pdf
 from utils.extractor import (
     extract_name, extract_email, extract_phone,
@@ -22,10 +24,33 @@ from utils.linkedin import generate_linkedin_headline, generate_professional_sum
 from utils.email_generator import generate_cold_email
 from utils.interview import generate_interview_questions
 
+# Day 8 Imports
+from utils.exporter import export_txt, export_markdown, export_pdf, export_docx
+from utils.history import save_resume_version, load_resume_history
+
+def init_session_state():
+    """Initializes Streamlit session state variables for the Export Center."""
+    if 'generated_content' not in st.session_state:
+        st.session_state.generated_content = {
+            'Resume Review': '',
+            'Cover Letter': '',
+            'LinkedIn Headlines': '',
+            'LinkedIn Summary': '',
+            'Cold Email': '',
+            'Interview Questions': ''
+        }
+    if 'current_session_id' not in st.session_state:
+        # Default session ID, can be tied to user login later
+        st.session_state.current_session_id = "user_session"
+    if 'raw_extracted_data' not in st.session_state:
+        st.session_state.raw_extracted_data = {}
+
 def main():
     """
     Main function to run the Streamlit AI Resume Analyzer application.
     """
+    init_session_state()
+    
     st.set_page_config(
         page_title="AI Career Assistant",
         page_icon="📄",
@@ -52,6 +77,10 @@ def main():
     with st.sidebar:
         st.image("https://via.placeholder.com/300x100.png?text=AI+Career+Assistant", use_container_width=True)
         st.title("Settings")
+        session_name = st.text_input("Session ID (For History)", value=st.session_state.current_session_id)
+        if session_name:
+            st.session_state.current_session_id = session_name
+            
         st.info("Check your `.env` file to ensure `GEMINI_API_KEY` is configured for AI features.")
 
     col1, col2 = st.columns([1, 8])
@@ -91,11 +120,13 @@ def main():
                 "skills": skills, "education": education,
                 "experience": experience, "projects": projects
             }
+            st.session_state.raw_extracted_data = extracted_data
 
             st.success("✅ Resume Processed Successfully!")
             st.markdown("---")
             
-            tab_extract, tab_ats, tab_jd, tab_ai, tab_cover, tab_linkedin, tab_email, tab_interview = st.tabs([
+            # Expanded Tabs for Day 8
+            tabs = st.tabs([
                 "📝 Extracted Info", 
                 "📊 ATS Score", 
                 "🎯 JD Match", 
@@ -103,8 +134,12 @@ def main():
                 "✉️ Cover Letter",
                 "💼 LinkedIn",
                 "📧 Cold Email",
-                "🎤 Interview Prep"
+                "🎤 Interview Prep",
+                "📤 Export Center",
+                "🕰️ History"
             ])
+            
+            tab_extract, tab_ats, tab_jd, tab_ai, tab_cover, tab_linkedin, tab_email, tab_interview, tab_export, tab_history = tabs
             
             with tab_extract:
                 col_a, col_b, col_c = st.columns(3)
@@ -155,12 +190,21 @@ def main():
                 st.markdown("### 🤖 Intelligent Resume Review")
                 if st.button("✨ Generate Review", key="btn_review"):
                     with st.spinner("Analyzing..."):
-                        st.info(review_resume(extracted_text))
-                        st.success(improve_summary(extracted_text))
-                        st.success(rewrite_experience(experience))
-                        st.warning(generate_resume_feedback(extracted_text))
+                        ai_review = review_resume(extracted_text)
+                        ai_sum = improve_summary(extracted_text)
+                        ai_exp = rewrite_experience(experience)
+                        ai_fb = generate_resume_feedback(extracted_text)
+                        ai_kws = suggest_missing_keywords(extracted_text, jd_text) if jd_text.strip() else "No JD provided."
+                        
+                        st.info(ai_review)
+                        st.success(ai_sum)
+                        st.success(ai_exp)
+                        st.warning(ai_fb)
                         if jd_text.strip():
-                            st.error(suggest_missing_keywords(extracted_text, jd_text))
+                            st.error(ai_kws)
+                            
+                        # Save to session
+                        st.session_state.generated_content['Resume Review'] = f"Review:\n{ai_review}\n\nSummary:\n{ai_sum}\n\nExperience:\n{ai_exp}\n\nFeedback:\n{ai_fb}\n\nKeywords:\n{ai_kws}"
 
             with tab_cover:
                 st.markdown("### ✉️ Cover Letter Generator")
@@ -170,20 +214,22 @@ def main():
                     if st.button("✨ Generate Cover Letter", key="btn_cl"):
                         with st.spinner("Writing..."):
                             cl_text = generate_cover_letter(extracted_text, jd_text)
+                            st.session_state.generated_content['Cover Letter'] = cl_text
                             st.markdown(cl_text)
-                            st.download_button("📥 Download txt", cl_text, "Cover_Letter.txt")
 
             with tab_linkedin:
                 st.markdown("### 💼 LinkedIn Profile Optimizer")
                 if st.button("✨ Generate LinkedIn Content", key="btn_li"):
                     with st.spinner("Optimizing..."):
-                        st.markdown("#### Headlines")
                         hl_text = generate_linkedin_headline(extracted_text)
+                        sum_text = generate_professional_summary(extracted_text)
+                        st.session_state.generated_content['LinkedIn Headlines'] = hl_text
+                        st.session_state.generated_content['LinkedIn Summary'] = sum_text
+                        
+                        st.markdown("#### Headlines")
                         st.info(hl_text)
                         st.markdown("#### About Section Summary")
-                        sum_text = generate_professional_summary(extracted_text)
                         st.success(sum_text)
-                        st.download_button("📥 Download Content", f"Headlines:\n{hl_text}\n\nSummary:\n{sum_text}", "LinkedIn_Content.txt")
 
             with tab_email:
                 st.markdown("### 📧 Cold Email Outreach Generator")
@@ -193,8 +239,8 @@ def main():
                     if st.button("✨ Generate Cold Email", key="btn_email"):
                         with st.spinner("Drafting..."):
                             email_text = generate_cold_email(extracted_text, jd_text)
+                            st.session_state.generated_content['Cold Email'] = email_text
                             st.markdown(email_text)
-                            st.download_button("📥 Download Email", email_text, "Cold_Email.txt")
 
             with tab_interview:
                 st.markdown("### 🎤 Interview Preparation")
@@ -204,13 +250,85 @@ def main():
                     if st.button("✨ Generate Interview Questions", key="btn_int"):
                         with st.spinner("Generating Q&A..."):
                             int_text = generate_interview_questions(extracted_text, jd_text)
+                            st.session_state.generated_content['Interview Questions'] = int_text
                             st.markdown(int_text)
-                            st.download_button("📥 Download Q&A", int_text, "Interview_Prep.txt")
+
+            # --- Day 8: Export Center ---
+            with tab_export:
+                st.markdown("### 📤 Export Center")
+                st.markdown("Download your AI-generated content in various formats.")
+                
+                content_options = [k for k, v in st.session_state.generated_content.items() if v]
+                
+                if not content_options:
+                    st.warning("No content generated yet. Please generate some content in the other tabs first.")
+                else:
+                    col_ex1, col_ex2 = st.columns(2)
+                    with col_ex1:
+                        selected_content = st.selectbox("Select Content to Export", content_options)
+                    with col_ex2:
+                        format_choice = st.selectbox("Select Format", ["PDF", "DOCX", "TXT", "Markdown"])
+                        
+                    content_to_export = st.session_state.generated_content[selected_content]
+                    
+                    st.markdown("---")
+                    
+                    # File generation
+                    filename_base = selected_content.replace(" ", "_")
+                    
+                    if format_choice == "TXT":
+                        data = export_txt(content_to_export)
+                        mime = "text/plain"
+                        ext = ".txt"
+                    elif format_choice == "Markdown":
+                        data = export_markdown(content_to_export)
+                        mime = "text/markdown"
+                        ext = ".md"
+                    elif format_choice == "DOCX":
+                        data = export_docx(content_to_export)
+                        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        ext = ".docx"
+                    elif format_choice == "PDF":
+                        data = export_pdf(content_to_export)
+                        mime = "application/pdf"
+                        ext = ".pdf"
+                        
+                    st.download_button(
+                        label=f"📥 Download {selected_content} as {format_choice}",
+                        data=data,
+                        file_name=f"{filename_base}{ext}",
+                        mime=mime,
+                        use_container_width=True
+                    )
+
+            # --- Day 8: History ---
+            with tab_history:
+                st.markdown("### 🕰️ Resume Version History")
+                
+                if st.button("💾 Save Current Session"):
+                    session_data = {
+                        "extracted_data": st.session_state.raw_extracted_data,
+                        "generated_content": st.session_state.generated_content,
+                        "jd_text": jd_text
+                    }
+                    path = save_resume_version(st.session_state.current_session_id, session_data)
+                    st.success(f"Session saved successfully! ({path})")
+                    
+                st.markdown("---")
+                st.markdown("#### Previous Sessions")
+                
+                histories = load_resume_history(st.session_state.current_session_id)
+                if not histories:
+                    st.info("No saved history found for this session ID.")
+                else:
+                    for h in histories:
+                        with st.expander(f"Session Snapshot: {h['timestamp_str']}"):
+                            st.json(h['extracted_data'])
                             
         except Exception as e:
             st.error(f"❌ **Failed to process Request:** {e}")
 
-    st.markdown('<div class="footer"><p>© 2026 AI Career Assistant</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer"><p>© 2026 AI Career Assistant | Built with Streamlit & Gemini AI</p></div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
